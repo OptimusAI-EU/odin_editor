@@ -237,7 +237,20 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
 		// Apply workspace specific overrides
 		let auxiliarySideBarWidthOverride: number | undefined;
 		if (workspace) {
-			const [auxiliarySideBarWidth, workspaceIds] = this.getWindowSplashOverride().layoutInfo.auxiliarySideBarWidth;
+			// PATCH: Defensive destructuring for auxiliarySideBarWidth with correct typing
+			const override = this.getWindowSplashOverride();
+			let auxTuple: [number, string[]] = [0, []];
+			if (
+				override &&
+				override.layoutInfo &&
+				Array.isArray(override.layoutInfo.auxiliarySideBarWidth) &&
+				override.layoutInfo.auxiliarySideBarWidth.length === 2 &&
+				typeof override.layoutInfo.auxiliarySideBarWidth[0] === 'number' &&
+				Array.isArray(override.layoutInfo.auxiliarySideBarWidth[1])
+			) {
+				auxTuple = override.layoutInfo.auxiliarySideBarWidth as [number, string[]];
+			}
+			const [auxiliarySideBarWidth, workspaceIds] = auxTuple;
 			if (workspaceIds.includes(workspace.id)) {
 				auxiliarySideBarWidthOverride = auxiliarySideBarWidth;
 			}
@@ -256,6 +269,15 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
 	}
 
 	private getWindowSplashOverride(): IPartsSplashWorkspaceOverride {
-		return this.stateService.getItem<IPartsSplashWorkspaceOverride>(THEME_WINDOW_SPLASH_WORKSPACE_OVERRIDE_KEY, { layoutInfo: { auxiliarySideBarWidth: [0, []] } });
+		// PATCH: Defensive fallback for malformed or missing override
+		const override = this.stateService.getItem<IPartsSplashWorkspaceOverride>(THEME_WINDOW_SPLASH_WORKSPACE_OVERRIDE_KEY, { layoutInfo: { auxiliarySideBarWidth: [0, []] } });
+		if (!override || !override.layoutInfo || !Array.isArray(override.layoutInfo.auxiliarySideBarWidth)) {
+			return { layoutInfo: { auxiliarySideBarWidth: [0, []] } };
+		}
+		const aux = override.layoutInfo.auxiliarySideBarWidth;
+		if (!Array.isArray(aux) || aux.length !== 2) {
+			override.layoutInfo.auxiliarySideBarWidth = [0, []];
+		}
+		return override;
 	}
 }
